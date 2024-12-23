@@ -30,3 +30,9 @@ To install the dependencies, create a virtual environment and run:
 ```bash
 pip install -r requirements.txt
 ```
+
+## Running locally
+Deploy streamlit using
+```bash
+streamlit run app.py
+```
