@@ -95,33 +95,40 @@ axes = axes.flatten()
 # Dictionary to store event messages with simulation number
 event_messages = {}
 
+# Loop over each starting salary
 for idx, initial_salary in enumerate(starting_salaries):
     trajectories = []
     labels = []
     final_balances = []
+    interest_costs = []  # To store total interest for this starting salary
 
     for sim_num in range(iterations):
         balance = initial_loan_balance
         salary = initial_salary
         annual_growth_rate = np.random.normal(annual_growth_mean, annual_growth_std)
         trajectory = []
+        total_interest = 0  # Track total interest for this simulation
 
         for year in range(1, loan_term_years + 1):
-            # Apply interest to the loan
-            balance *= (1 + interest_rate)
+            # Calculate annual interest accrued
+            interest_accrued = balance * interest_rate
+            total_interest += interest_accrued
 
-            # Apply life events based on user selection
+            # Update loan balance with interest
+            balance += interest_accrued
+
+            # Apply life events and repayments
             salary, balance, event_message = apply_life_events(year, salary, balance, simulate_pregnancy,
                                                                simulate_layoff, simulate_sick_leave,
                                                                simulate_job_change, paycut_percentage)
 
-            # If an event occurred, record the event message along with simulation number
+            # Record event messages
             if event_message:
                 if year not in event_messages:
                     event_messages[year] = []
-                event_messages[year].append((sim_num + 1, event_message))  # Store simulation number along with event
+                event_messages[year].append((sim_num + 1, event_message))
 
-            # Calculate annual repayment
+            # Calculate repayment
             if salary > repayment_threshold:
                 repayment = (salary - repayment_threshold) * repayment_rate
             else:
@@ -129,18 +136,25 @@ for idx, initial_salary in enumerate(starting_salaries):
 
             # Deduct repayment from balance
             balance -= repayment
+
+            # Track trajectory
             trajectory.append(balance if balance > 0 else 0)
 
-            # Check if loan is paid off
+            # Break if loan is fully repaid
             if balance <= 0:
                 break
 
             # Update salary for the next year
             salary *= (1 + annual_growth_rate)
 
+        # Store results for this simulation
         trajectories.append(trajectory)
         labels.append(f"Sim {sim_num + 1}: Growth Rate {annual_growth_rate:.2%}")
         final_balances.append((sim_num, trajectory[-1] if len(trajectory) == loan_term_years else 0))
+        interest_costs.append(total_interest)  # Store total interest for this simulation
+
+    # Calculate average interest for this salary
+    avg_interest = np.mean(interest_costs)
 
     # Sort final balances to pick top, bottom, and middle trajectories
     final_balances.sort(key=lambda x: x[1])
@@ -149,7 +163,7 @@ for idx, initial_salary in enumerate(starting_salaries):
     bottom_indices = [idx for idx, _ in final_balances[-3:]]  # Highest balances (slowest repayment)
     annotate_indices = top_indices + middle_indices + bottom_indices
 
-    # Plotting repayment trajectories for each starting salary
+    # Plot repayment trajectories
     ax = axes[idx]
     for i, trajectory in enumerate(trajectories):
         if i in annotate_indices:
@@ -157,7 +171,8 @@ for idx, initial_salary in enumerate(starting_salaries):
         else:
             ax.plot(trajectory, alpha=0.3, linewidth=0.8, color='gray')
 
-    ax.set_title(f"Starting Salary: £{initial_salary}")
+    # Add the average interest paid to the subplot title
+    ax.set_title(f"Starting Salary: £{initial_salary}\nAvg Interest Paid: £{avg_interest:,.2f}")
     ax.set_xlabel("Years")
     ax.set_ylabel("Loan Balance (£)")
     ax.grid(True)
