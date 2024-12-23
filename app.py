@@ -241,12 +241,27 @@ if page == "Student Loan Simulation":
 elif page == "Parameter Analysis":
     st.title("Monte Carlo Parameter Analysis")
 
+    # Parameter ranges, including lump sums
+
     # Parameter ranges
     param_ranges = {
         'starting_salary': np.linspace(30000, 120000, 10),
         'student_loan_rate': np.linspace(0.02, 0.08, 10),
-        'mortgage_rate': np.linspace(0.02, 0.08, 10)
+        'mortgage_rate': np.linspace(0.02, 0.08, 10),
     }
+
+    # Allow the user to input the lump sum value
+    lump_sum_input = st.number_input("Enter the lump sum amount for mortgage", min_value=0, max_value=100000, step=5000, value=50000)
+    mortgage_loan_term = st.slider("Enter the mortgage loan term", min_value=0, max_value=40, value=25)
+    sl_loan_term = st.slider("Enter the student loan term", min_value=0, max_value=40, value=25)
+    sl_loan_rate = st.slider("Enter the student loan repayment rate %", min_value=0, max_value=20, value=9)
+    initial_sl_balance = st.slider("Initial student loan balance", min_value=0, max_value=100000, value=60000)
+    repayment_threshold = st.slider("Student loan repayment_threshold", min_value=0, max_value=100000, value=24990)
+    annual_growth_mean = 0.03
+    annual_growth_std = 0.05
+    iterations = 100
+    mortgage_balance = st.slider("Initial Mortgage Balance", min_value=0, max_value=2000000, value=450000)
+
 
     # Run simulations
     results = []
@@ -254,31 +269,33 @@ elif page == "Parameter Analysis":
     for salary in param_ranges['starting_salary']:
         for sl_rate in param_ranges['student_loan_rate']:
             for m_rate in param_ranges['mortgage_rate']:
+                lump_sum = lump_sum_input
                 # Student loan simulation
                 sl_interest = simulate_student_loan(
-                    initial_balance=60000,
+                    initial_balance=initial_sl_balance,
                     interest_rate=sl_rate,
-                    repayment_threshold=24990,
-                    repayment_rate=0.09,
-                    loan_term_years=25,
+                    repayment_threshold=repayment_threshold,
+                    repayment_rate=sl_loan_rate/100,
+                    loan_term_years=sl_loan_term,
                     salary=salary,
-                    annual_growth_mean=0.03,
-                    annual_growth_std=0.05,
-                    iterations=50
+                    annual_growth_mean=annual_growth_mean,
+                    annual_growth_std=annual_growth_std,
+                    iterations=iterations
                 )
 
-                # Mortgage simulation
+                # Mortgage simulation with different lump sums
                 m_interest = simulate_mortgage(
-                    lump_sum=50000,
-                    mortgage_balance=200000,
+                    lump_sum=lump_sum,
+                    mortgage_balance=mortgage_balance,
                     interest_rate=m_rate,
-                    years=25
+                    years=mortgage_loan_term
                 )
 
                 results.append({
                     'salary': salary,
                     'student_loan_rate': sl_rate * 100,
                     'mortgage_rate': m_rate * 100,
+                    'lump_sum': lump_sum,  # Track lump sum
                     'student_loan_interest': sl_interest,
                     'mortgage_interest': m_interest,
                     'difference': sl_interest - m_interest,
@@ -299,19 +316,29 @@ elif page == "Parameter Analysis":
 
     for idx, salary in enumerate(salary_samples):
         salary_data = df[np.isclose(df['salary'], salary, atol=5000)]
-        pivot = salary_data.pivot(
+
+        # Use pivot_table with aggregation to handle duplicates
+        pivot = salary_data.pivot_table(
             index='student_loan_rate',
             columns='mortgage_rate',
-            values='difference'
+            values='difference',
+            aggfunc='mean'  # Aggregating by mean to handle duplicates
         )
 
         im = axes[idx].imshow(pivot, cmap='RdYlBu', aspect='auto', vmin=vmin, vmax=vmax)
-        axes[idx].set_title(f'Salary: £{salary:,.0f}')
+        axes[idx].set_title(f'Salary: £{salary:,.0f}, Lump Sum: £{salary_data["lump_sum"].iloc[0]:,.0f}')
         axes[idx].set_xlabel('Mortgage Rate (%)')
         axes[idx].set_ylabel('Student Loan Rate (%)')
 
         # Add decision boundary line
         zero_level = axes[idx].contour(pivot.values, levels=[0], colors='black', linestyles='dashed')
+
+        # Adjust annotation positions
+        ax = axes[idx]
+        ax.annotate(f"Salary Growth Avg: {annual_growth_mean*100:,.1f}%", xy=(0.02, 0.95), xycoords='axes fraction', ha='left', va='top',
+                    fontsize=10, color='black')
+        ax.annotate(f"Iterations: {iterations}", xy=(0.02, 0.85), xycoords='axes fraction', ha='left',
+                    va='top', fontsize=10, color='black')
 
     plt.tight_layout()
     st.pyplot(fig)
@@ -319,9 +346,6 @@ elif page == "Parameter Analysis":
     st.write("Blue regions indicate paying off student loan is better")
     st.write("Red regions indicate paying off mortgage is better")
     st.write("Dotted line indicates decision boundary line")
-
-    # Show summary statistics
-    st.subheader("Summary Statistics")
     # Show key patterns
     st.subheader("Key Findings")
     high_diff = df.nlargest(1, 'difference')
@@ -329,11 +353,14 @@ elif page == "Parameter Analysis":
 
     st.write(f"Most favorable for student loan: Salary £{high_diff['salary'].iloc[0]:,.0f}, "
              f"SL Rate {high_diff['student_loan_rate'].iloc[0]:.1f}%, "
-             f"Mortgage Rate {high_diff['mortgage_rate'].iloc[0]:.1f}%")
+             f"Mortgage Rate {high_diff['mortgage_rate'].iloc[0]:.1f}%, "
+             f"Lump Sum £{high_diff['lump_sum'].iloc[0]:,.0f}")
 
     st.write(f"Most favorable for mortgage: Salary £{low_diff['salary'].iloc[0]:,.0f}, "
              f"SL Rate {low_diff['student_loan_rate'].iloc[0]:.1f}%, "
-             f"Mortgage Rate {low_diff['mortgage_rate'].iloc[0]:.1f}%")
+             f"Mortgage Rate {low_diff['mortgage_rate'].iloc[0]:.1f}%, "
+             f"Lump Sum £{low_diff['lump_sum'].iloc[0]:,.0f}")
+
 else:
     st.title("Lump-Sum Analysis")
     st.write("Determine whether a lump sum is best used to pay off a mortgage or a student loan.")
