@@ -167,6 +167,33 @@ for idx, initial_salary in enumerate(starting_salaries):
 plt.tight_layout()
 st.pyplot(fig)
 
+# Assumptions Summary
+st.subheader("Assumptions Summary")
+st.markdown("""
+### Loan and Repayment Assumptions
+- Initial loan balance, repayment threshold, repayment rate, interest rate, and loan term are user-defined inputs.
+- Interest is compounded annually on the remaining balance.
+
+### Salary Growth
+- Starting salaries are selected from user inputs, and annual salary growth is modeled using a normal distribution with user-defined mean and standard deviation.
+
+### Life Events
+- Life events are randomly simulated with a 10% chance per year:
+    - **Pregnancy**: 9 months of no income, during which interest accrues on the loan balance.
+    - **Layoff**: 6 months with 50% reduced income and accrued interest.
+    - **Sick Leave**: 3 months with 20% reduced income and accrued interest.
+    - **Job Change**: Either a user-defined pay cut or pay rise, occurring with equal probability.
+- The occurrence of life events is governed by user preferences for each event type.
+
+### Repayment Calculations
+- Repayments are calculated annually if the salary exceeds the repayment threshold.
+- Repayment equals the amount over the threshold multiplied by the repayment rate.
+
+### Monte Carlo Simulation
+- Each simulation runs for up to the specified loan term or until the loan is paid off.
+- Results include trajectories for loan repayment across multiple simulations for selected starting salaries.
+""")
+
 # Display random sampled life events with simulation number
 st.subheader("Random Sample of Life Events")
 event_messages_flat = [(sim_num, msg) for msgs in event_messages.values() for sim_num, msg in msgs]
