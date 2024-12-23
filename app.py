@@ -2,12 +2,13 @@ import random
 import numpy as np
 from matplotlib import pyplot as plt
 import streamlit as st
+import pandas as pd
 
 import streamlit as st
 from loan_utils import simulate_student_loan, simulate_mortgage
 
 # Add page navigation
-page = st.sidebar.selectbox("Choose a Page", ["Student Loan Simulation", "Lump-Sum Analysis"])
+page = st.sidebar.selectbox("Choose a Page", ["Student Loan Simulation","Lump-Sum Analysis", "Parameter Analysis"])
 
 if page == "Student Loan Simulation":
     # Existing student loan simulation code
@@ -236,6 +237,103 @@ if page == "Student Loan Simulation":
 
     for sim_num, event in random_sample:
         st.write(f"- Simulation {sim_num}: {event}")
+# Add this to app.py
+elif page == "Parameter Analysis":
+    st.title("Monte Carlo Parameter Analysis")
+
+    # Parameter ranges
+    param_ranges = {
+        'starting_salary': np.linspace(30000, 120000, 10),
+        'student_loan_rate': np.linspace(0.02, 0.08, 10),
+        'mortgage_rate': np.linspace(0.02, 0.08, 10)
+    }
+
+    # Run simulations
+    results = []
+    global im
+    for salary in param_ranges['starting_salary']:
+        for sl_rate in param_ranges['student_loan_rate']:
+            for m_rate in param_ranges['mortgage_rate']:
+                # Student loan simulation
+                sl_interest = simulate_student_loan(
+                    initial_balance=60000,
+                    interest_rate=sl_rate,
+                    repayment_threshold=24990,
+                    repayment_rate=0.09,
+                    loan_term_years=25,
+                    salary=salary,
+                    annual_growth_mean=0.03,
+                    annual_growth_std=0.05,
+                    iterations=50
+                )
+
+                # Mortgage simulation
+                m_interest = simulate_mortgage(
+                    lump_sum=50000,
+                    mortgage_balance=200000,
+                    interest_rate=m_rate,
+                    years=25
+                )
+
+                results.append({
+                    'salary': salary,
+                    'student_loan_rate': sl_rate * 100,
+                    'mortgage_rate': m_rate * 100,
+                    'student_loan_interest': sl_interest,
+                    'mortgage_interest': m_interest,
+                    'difference': sl_interest - m_interest,
+                    'better_choice': 'Student Loan' if sl_interest > m_interest else 'Mortgage'
+                })
+
+    df = pd.DataFrame(results)
+
+    # Create heatmap for each salary level
+    fig, axes = plt.subplots(2, 2, figsize=(15, 15))
+    axes = axes.flatten()
+
+    salary_samples = np.quantile(param_ranges['starting_salary'], [0.2, 0.4, 0.6, 0.8])
+
+    # Find global min and max for consistent color scaling
+    vmin = df['difference'].min()
+    vmax = df['difference'].max()
+
+    for idx, salary in enumerate(salary_samples):
+        salary_data = df[np.isclose(df['salary'], salary, atol=5000)]
+        pivot = salary_data.pivot(
+            index='student_loan_rate',
+            columns='mortgage_rate',
+            values='difference'
+        )
+
+        im = axes[idx].imshow(pivot, cmap='RdYlBu', aspect='auto', vmin=vmin, vmax=vmax)
+        axes[idx].set_title(f'Salary: £{salary:,.0f}')
+        axes[idx].set_xlabel('Mortgage Rate (%)')
+        axes[idx].set_ylabel('Student Loan Rate (%)')
+
+        # Add decision boundary line
+        zero_level = axes[idx].contour(pivot.values, levels=[0], colors='black', linestyles='dashed')
+
+    plt.tight_layout()
+    st.pyplot(fig)
+
+    st.write("Blue regions indicate paying off student loan is better")
+    st.write("Red regions indicate paying off mortgage is better")
+    st.write("Dotted line indicates decision boundary line")
+
+    # Show summary statistics
+    st.subheader("Summary Statistics")
+    # Show key patterns
+    st.subheader("Key Findings")
+    high_diff = df.nlargest(1, 'difference')
+    low_diff = df.nsmallest(1, 'difference')
+
+    st.write(f"Most favorable for student loan: Salary £{high_diff['salary'].iloc[0]:,.0f}, "
+             f"SL Rate {high_diff['student_loan_rate'].iloc[0]:.1f}%, "
+             f"Mortgage Rate {high_diff['mortgage_rate'].iloc[0]:.1f}%")
+
+    st.write(f"Most favorable for mortgage: Salary £{low_diff['salary'].iloc[0]:,.0f}, "
+             f"SL Rate {low_diff['student_loan_rate'].iloc[0]:.1f}%, "
+             f"Mortgage Rate {low_diff['mortgage_rate'].iloc[0]:.1f}%")
 else:
     st.title("Lump-Sum Analysis")
     st.write("Determine whether a lump sum is best used to pay off a mortgage or a student loan.")
