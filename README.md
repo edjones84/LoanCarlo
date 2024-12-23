@@ -14,7 +14,7 @@
 ---
 
 ## Demo
-You can interact with the app directly on [Streamlit Community Cloud](https://your_username-your_repository_name.streamlit.app) once deployed.
+You can interact with the app directly on [Streamlit Community Cloud](https://loancarlo.streamlit.app/) once deployed.
 
 ---
 
