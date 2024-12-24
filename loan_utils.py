@@ -123,4 +123,5 @@ def simulate_index_fund(lump_sum, annual_return_mean, annual_return_std, years, 
         total_future_value += current_value
 
     avg_future_value = total_future_value / iterations
-    return avg_future_value
+    avg_gains = avg_future_value - lump_sum  # Subtract the initial lump sum to calculate gains
+    return avg_gains
