@@ -8,7 +8,9 @@ import streamlit as st
 from loan_utils import simulate_student_loan, simulate_mortgage, simulate_index_fund
 
 # Add page navigation
-page = st.sidebar.selectbox("Choose a Page", ["Student Loan Simulation","Mortgage Lump-Sum Analysis", "Fund Lump-Sum Analysis","Parameter Analysis"])
+page = st.sidebar.selectbox("Choose a Page",
+                            ["Student Loan Simulation", "Mortgage Lump-Sum Analysis", "Fund Lump-Sum Analysis",
+                             "Parameter Analysis"])
 
 if page == "Student Loan Simulation":
     # Existing student loan simulation code
@@ -21,12 +23,13 @@ if page == "Student Loan Simulation":
     interest_rate = st.sidebar.slider("Interest Rate (%):", min_value=0.0, max_value=10.0, value=4.3) / 100
     loan_term_years = st.sidebar.number_input("Loan Term (Years):", min_value=1, value=25)
     iterations = st.sidebar.number_input("Number of Simulations:", min_value=10, max_value=1000, value=100)
+    starting_salary = st.sidebar.number_input("Your Starting Salary:", min_value=10000, max_value=400000, value=30000)
     starting_salaries = st.sidebar.multiselect(
-        "Starting Salaries (£):",
+        "Starting Salaries for Simulations (£):",
         options=[20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000, 120000],
         default=[30000, 60000, 90000, 120000]
     )
-    annual_growth_mean = st.sidebar.slider("Average Annual Salary Growth (%):", min_value=-10.0, max_value=10.0,
+    annual_growth_mean = st.sidebar.slider("Average Annual Salary Growth (%):", min_value=-10.0, max_value=40.0,
                                            value=3.0) / 100
     annual_growth_std = st.sidebar.slider("Annual Growth Std Dev (%):", min_value=0.0, max_value=20.0, value=5.0) / 100
 
@@ -39,6 +42,75 @@ if page == "Student Loan Simulation":
     paycut_percentage = st.sidebar.slider("Paycut Percentage (%)", min_value=0, max_value=50, value=20)
     payrise_percentage = st.sidebar.slider("Payrise Percentage (%)", min_value=0, max_value=50, value=20)
 
+
+    # Deterministic repayment calculation
+    def calculate_repayment_trajectory(initial_loan_balance, initial_salary, repayment_threshold, repayment_rate,
+                                       interest_rate, annual_growth_mean, loan_term_years):
+        balance = initial_loan_balance
+        salary = initial_salary
+        loan_trajectory = []
+        salary_trajectory = []
+        for year in range(1, loan_term_years + 1):
+            if balance <= 0:
+                break
+
+            # Apply interest and calculate repayment
+            if salary > repayment_threshold:
+                annual_interest = balance * interest_rate
+                repayment = (salary - repayment_threshold) * repayment_rate
+
+                # Deduct repayment from balance
+                if repayment > annual_interest:
+                    balance -= (repayment - annual_interest)
+                else:
+                    balance += (annual_interest - repayment)
+            else:
+                balance += balance * interest_rate
+
+            loan_trajectory.append(balance if balance > 0 else 0)
+            salary_trajectory.append(salary)
+
+            # Update salary for the next year
+            salary *= (1 + annual_growth_mean)
+
+        return loan_trajectory, salary_trajectory
+
+
+    # Generate repayment and salary trajectories
+    loan_trajectory, salary_trajectory = calculate_repayment_trajectory(
+        initial_loan_balance,
+        starting_salary,
+        repayment_threshold,
+        repayment_rate,
+        interest_rate,
+        annual_growth_mean,
+        loan_term_years
+    )
+
+    # Plot repayment trajectory with salary on a second Y-axis
+    st.subheader("Your Loan Repayment and Salary Trajectory")
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+
+    # Plot loan balance on the first Y-axis
+    ax1.plot(loan_trajectory, label="Loan Balance (£)", color='blue', linewidth=2)
+    ax1.set_xlabel("Years")
+    ax1.set_ylabel("Loan Balance (£)", color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+    ax1.axhline(0, color='black', linestyle='--', linewidth=1, label="Paid Off")
+    ax1.grid(True)
+
+    # Create a second Y-axis for salary
+    ax2 = ax1.twinx()
+    ax2.plot(salary_trajectory, label="Salary (£)", color='green', linewidth=2, linestyle='dashed')
+    ax2.set_ylabel("Salary (£)", color='green')
+    ax2.tick_params(axis='y', labelcolor='green')
+
+    # Add a title and legend
+    fig.suptitle("Loan Repayment and Salary Growth Over Time", fontsize=16)
+    fig.tight_layout()
+    st.pyplot(fig)
+
+    st.subheader("Monte Carlo Simulation")
 
     # Function to simulate life events
     def apply_life_events(year, salary, loan_balance, simulate_pregnancy, simulate_layoff, simulate_sick_leave,
@@ -193,7 +265,7 @@ if page == "Student Loan Simulation":
     st.pyplot(fig)
 
     # Assumptions Summary
-    st.subheader("Assumptions Summary")
+    st.subheader("Monte Carlo Assumptions Summary")
     st.markdown("""
     ### Loan and Repayment Assumptions
     - Initial loan balance, repayment threshold, repayment rate, interest rate, and loan term are user-defined inputs.
@@ -251,7 +323,8 @@ elif page == "Parameter Analysis":
     }
 
     # Allow the user to input the lump sum value
-    lump_sum_input = st.number_input("Enter the lump sum amount for mortgage", min_value=0, max_value=100000, step=5000, value=50000)
+    lump_sum_input = st.number_input("Enter the lump sum amount for mortgage", min_value=0, max_value=100000, step=5000,
+                                     value=50000)
     mortgage_loan_term = st.slider("Enter the mortgage loan term", min_value=0, max_value=40, value=25)
     sl_loan_term = st.slider("Enter the student loan term", min_value=0, max_value=40, value=25)
     sl_loan_rate = st.slider("Enter the student loan repayment rate %", min_value=0, max_value=20, value=9)
@@ -261,7 +334,6 @@ elif page == "Parameter Analysis":
     annual_growth_std = 0.05
     iterations = 100
     mortgage_balance = st.slider("Initial Mortgage Balance", min_value=0, max_value=2000000, value=450000)
-
 
     # Run simulations
     results = []
@@ -275,7 +347,7 @@ elif page == "Parameter Analysis":
                     initial_balance=initial_sl_balance,
                     interest_rate=sl_rate,
                     repayment_threshold=repayment_threshold,
-                    repayment_rate=sl_loan_rate/100,
+                    repayment_rate=sl_loan_rate / 100,
                     loan_term_years=sl_loan_term,
                     salary=salary,
                     annual_growth_mean=annual_growth_mean,
@@ -335,7 +407,8 @@ elif page == "Parameter Analysis":
 
         # Adjust annotation positions
         ax = axes[idx]
-        ax.annotate(f"Salary Growth Avg: {annual_growth_mean*100:,.1f}%", xy=(0.02, 0.95), xycoords='axes fraction', ha='left', va='top',
+        ax.annotate(f"Salary Growth Avg: {annual_growth_mean * 100:,.1f}%", xy=(0.02, 0.95), xycoords='axes fraction',
+                    ha='left', va='top',
                     fontsize=10, color='black')
         ax.annotate(f"Iterations: {iterations}", xy=(0.02, 0.85), xycoords='axes fraction', ha='left',
                     va='top', fontsize=10, color='black')
