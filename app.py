@@ -5,10 +5,10 @@ import streamlit as st
 import pandas as pd
 
 import streamlit as st
-from loan_utils import simulate_student_loan, simulate_mortgage
+from loan_utils import simulate_student_loan, simulate_mortgage, simulate_index_fund
 
 # Add page navigation
-page = st.sidebar.selectbox("Choose a Page", ["Student Loan Simulation","Lump-Sum Analysis", "Parameter Analysis"])
+page = st.sidebar.selectbox("Choose a Page", ["Student Loan Simulation","Mortgage Lump-Sum Analysis", "Fund Lump-Sum Analysis","Parameter Analysis"])
 
 if page == "Student Loan Simulation":
     # Existing student loan simulation code
@@ -360,9 +360,55 @@ elif page == "Parameter Analysis":
              f"SL Rate {low_diff['student_loan_rate'].iloc[0]:.1f}%, "
              f"Mortgage Rate {low_diff['mortgage_rate'].iloc[0]:.1f}%, "
              f"Lump Sum £{low_diff['lump_sum'].iloc[0]:,.0f}")
+elif page == "Fund Lump-Sum Analysis":
+    # Streamlit page for Index Fund Analysis
+    st.title("Index Fund Lump-Sum Investment Analysis")
+    st.write("Determine whether a lump sum is best used to invest in an index fund or pay off a student loan.")
+
+    # User Inputs
+    lump_sum = st.number_input("Lump Sum Available (£):", min_value=0, value=50000)
+
+    # Student loan parameters
+    st.subheader("Student Loan Parameters")
+    initial_loan_balance = st.number_input("Student Loan Balance (£):", min_value=0, value=60000)
+    starting_salary = st.number_input("Starting Salary (£):", min_value=0, value=30000)
+    repayment_threshold = st.number_input("Repayment Threshold (£):", min_value=0, value=24990)
+    repayment_rate = st.slider("Repayment Rate (%):", min_value=0.0, max_value=20.0, value=9.0) / 100
+    loan_interest_rate = st.slider("Student Loan Interest Rate (%):", min_value=0.0, max_value=10.0, value=4.3) / 100
+    loan_term_years = st.number_input("Loan Term (Years):", min_value=1, value=25)
+    annual_growth_mean = st.slider("Annual Salary Growth Mean (%):", min_value=-10.0, max_value=10.0, value=3.0) / 100
+    annual_growth_std = st.slider("Annual Growth Std Dev (%):", min_value=0.0, max_value=20.0, value=5.0) / 100
+    iterations = st.number_input("Number of Simulations:", min_value=10, max_value=1000, value=100)
+
+    # Index fund parameters
+    st.subheader("Index Fund Parameters")
+    annual_return_mean = st.slider("Expected Annual Return (%):", min_value=-10.0, max_value=20.0, value=7.0) / 100
+    annual_return_std = st.slider("Return Volatility (Std Dev, %):", min_value=0.0, max_value=20.0, value=15.0) / 100
+    investment_horizon = st.number_input("Investment Horizon (Years):", min_value=1, value=25)
+
+    # Simulate results
+    avg_student_loan_interest = simulate_student_loan(
+        initial_loan_balance, loan_interest_rate, repayment_threshold, repayment_rate,
+        loan_term_years, starting_salary, annual_growth_mean, annual_growth_std, iterations
+    )
+
+    avg_index_fund_value = simulate_index_fund(
+        lump_sum, annual_return_mean, annual_return_std, investment_horizon, iterations
+    )
+
+    # Display Results
+    st.subheader("Results")
+    st.write(f"**Average Interest Paid on Student Loan:** £{avg_student_loan_interest:,.2f}")
+    st.write(f"**Average Future Value of Index Fund Investment:** £{avg_index_fund_value:,.2f}")
+
+    # Comparison
+    if avg_index_fund_value > avg_student_loan_interest:
+        st.success("Investing in the index fund provides the best returns.")
+    else:
+        st.success("Using the lump sum to pay off the student loan is more beneficial.")
 
 else:
-    st.title("Lump-Sum Analysis")
+    st.title("Mortgage Lump-Sum Analysis")
     st.write("Determine whether a lump sum is best used to pay off a mortgage or a student loan.")
 
     # User inputs

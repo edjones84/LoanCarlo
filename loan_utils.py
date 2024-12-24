@@ -109,3 +109,18 @@ def simulate_mortgage(lump_sum, mortgage_balance, interest_rate, years):
             break
 
     return total_interest_paid
+
+
+def simulate_index_fund(lump_sum, annual_return_mean, annual_return_std, years, iterations):
+    total_future_value = 0
+
+    for _ in range(iterations):
+        current_value = lump_sum
+        for year in range(years):
+            # Simulate the return for the year
+            annual_return = np.random.normal(annual_return_mean, annual_return_std)
+            current_value *= (1 + annual_return)
+        total_future_value += current_value
+
+    avg_future_value = total_future_value / iterations
+    return avg_future_value
